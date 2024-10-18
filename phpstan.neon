@@ -1,0 +1,8 @@
+parameters:
+    level: 5
+    paths:
+        - avarda-schedule-order-completion.php
+        - src
+    scanDirectories:
+        - ./vendor/php-stubs
+    treatPhpDocTypesAsCertain: false
