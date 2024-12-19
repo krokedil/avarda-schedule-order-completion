@@ -22,7 +22,7 @@ class Scheduler {
 	 *
 	 * @var string
 	 */
-	private $failed_status = 'failed';
+	private $failed_status = 'on-hold';
 
 	/**
 	 * The on hold order status to set the order to when it is scheduled.
@@ -100,8 +100,16 @@ class Scheduler {
 				continue;
 			}
 
-			// If the order has a failed status, just continue.
-			if ( $this->failed_status === $order->get_status() ) {
+			ACO_WC()->order_management->activate_reservation( $order_id ); // @phpstan-ignore-line
+
+			// If we did any of the actions for a failed capture call, then we need to reschedule the order.
+			if ( did_action( 'aco_om_failed' ) > 0 ) {
+				// Get the amount of times the order has been rescheduled.
+				$reschedule_count = intval( $order->get_meta( '_aco_reschedule_completion_count' ) ?: 0 ); // phpcs:ignore
+				$order->update_meta_data( '_aco_reschedule_completion_count', strval( $reschedule_count + 1 ) );
+				$order->add_order_note( __( 'The Avarda order could not be activated after being scheduled, and a activation request was made. It will be scheduled to try again later.', 'avarda-schedule-order-completion' ) );
+				$to_reschedule[] = $order;
+				$order->save();
 				continue;
 			}
 
@@ -191,7 +199,9 @@ class Scheduler {
 		if ( ! empty( $purchase_id ) ) { // If we have a purchase id, we can try to get the payment.
 			$payment = ACO_WC()->api->request_get_payment( $purchase_id ); // @phpstan-ignore-line
 
-			if ( ! is_wp_error( $payment ) && $payment['processedBackEnd'] ) { // If we could get the payment, and it is processed, we can complete the order.
+			$is_processed_backend = apply_filters( 'aco_is_processed_backend', $payment['processedBackEnd'] ?? false, $payment, $order );
+
+			if ( ! is_wp_error( $payment ) && $is_processed_backend ) { // If we could get the payment, and it is processed, we can complete the order.
 				return apply_filters( 'aco_should_schedule_order_completion', false, $order, $payment );
 			}
 
