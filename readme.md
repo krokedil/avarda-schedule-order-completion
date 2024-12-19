@@ -49,6 +49,6 @@ add_filter( 'avarda_schedule_order_on_hold_status', function( $status ) {
 } );
 
 add_filter( 'aco_should_schedule_order_completion', function( $result, $order, $purchase ) {
-    return false;
+    return false; // To force the order to be scheduled for retry. You can add more logic here to determine if the order should be scheduled or not.
 }, 10, 3 );
 ```
