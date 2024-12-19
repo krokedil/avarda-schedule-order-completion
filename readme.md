@@ -1,11 +1,13 @@
 ## Avarda Schedule Order Completion feature plugin.
 
 ### Description
-This feature plugin will hook in before an order is updated to ensure that the status transition to Completed, or the status set by the filter `avarda_schedule_order_completion_status`, can be processed successfully before the status is set in WooCommerce.
+This feature plugin will hook in before an order is updated to ensure that the status transition to Completed, can be processed successfully before the status is set in WooCommerce.
 
 If the status can not be set, the order will be scheduled for completion at a later time, allowing for the order to possibly be processed fully by either a customer or manually corrected by an admin before we try to set the status and send the order activation call to Avarda.
 
 The order can be scheduled for retry up to 5 times, and if the order needs to be scheduled it will be set to On Hold to highlight the order for the merchant.
+
+If the order is completed successfully after being scheduled, the order will be set to either Completed or a status set by the filter `avarda_schedule_order_completion_status`
 
 The checks that are made to ensure the order can be completed successfully with Avarda are:
 1. The order has a valid Avarda Purchase ID set as the metadata.
@@ -25,3 +27,28 @@ This solves a few issues that can happen, namely:
 It does not solve right now:
 - HTTP error code 500 from Avardas API, but it could be made to hook in to the error handling from the request itself to active the order, but that will not be able to prevent the status transition.
 - Avarda error code 507, Purchase denied due to insufficient customer balance. As above, this can be added in the same way. But could also be done directly when we fetch the order if we want, since we can make a check against the order ballance and the order total in WooCommerce. This was not implemented yet to prevent issues incase of rounding differences.
+
+### Filters
+- `avarda_schedule_order_completion_status` - Filter the status that the order will be set to after being successfully completed.
+- `avarda_schedule_order_failed_status` - Filter the status that the order will be set to after failing to be completed 5 times, default is on-hold.
+- `avarda_schedule_order_on_hold_status` - Filter the status that the order will be set to when it is scheduled for retry, default is on-hold.
+- `aco_should_schedule_order_completion` - Filter if an order should be scheduled for completion or not. The result is passed as the first argument, the order as the second and the purchase from Avarda as the third if a request was made successfully, or a WP Error if it was unsuccessful.
+- `aco_is_processed_backend` - Filter to be able to override the check for if the Avarda order has been processed in their backend or not. Can be used for testing purposes to force the order to be scheduled for retry.
+
+```php
+add_filter( 'avarda_schedule_order_completion_status', function( $status ) {
+    return 'processing'; // Or any other status you want to set the order to when it has been successfully completed.
+} );
+
+add_filter( 'avarda_schedule_order_failed_status', function( $status ) {
+    return 'failed'; // Or any other status you want to set the order to when it has failed to be completed 5 times.
+} );
+
+add_filter( 'avarda_schedule_order_on_hold_status', function( $status ) {
+    return 'on-hold'; // Or any other status you want to set the order to when it is scheduled for retry.
+} );
+
+add_filter( 'aco_should_schedule_order_completion', function( $result, $order, $purchase ) {
+    return false;
+}, 10, 3 );
+```

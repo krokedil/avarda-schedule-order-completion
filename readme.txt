@@ -13,6 +13,10 @@ Stable tag: 1.1.0
 A feature plugin for Avarda Checkout for WooCommerce to allow for scheduling of order completion when using Avarda Checkout for orders that cant be activated directly.
 
 == CHANGELOG ==
+= 2024.12.19        - version 1.2.0 =
+* Feature           - Added filters for all order status transitions to allow for more customization.
+* Feature           - Ensure the order status is not changed to completed when testing if the order can be activated to prevent the customer from getting extra emails.
+
 = 2024.11.21        - version 1.1.0 =
 * Feature           - Don't prevent the order status from changing when its set to Completed, but update it to on-hold after if we need to schedule it.
 * Feature           - Set the order status to failed after 5 attempts to schedule the order completion.
