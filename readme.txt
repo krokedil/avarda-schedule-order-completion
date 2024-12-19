@@ -8,7 +8,7 @@ WC requires at least: 5.6.0
 WC tested up to: 9.4.2
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
-Stable tag: 1.1.0
+Stable tag: 1.2.0
 
 A feature plugin for Avarda Checkout for WooCommerce to allow for scheduling of order completion when using Avarda Checkout for orders that cant be activated directly.
 
