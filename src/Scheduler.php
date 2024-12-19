@@ -18,36 +18,58 @@ class Scheduler {
 	private $completed_status = 'completed';
 
 	/**
+	 * The failed order status to set the order to after 5 reschedules.
+	 *
+	 * @var string
+	 */
+	private $failed_status = 'on-hold';
+
+	/**
+	 * The on hold order status to set the order to when it is scheduled.
+	 *
+	 * @var string
+	 */
+	private $on_hold_status = 'on-hold';
+
+	/**
 	 * Class constructor.
 	 *
 	 * @return void
 	 */
 	public function __construct() {
-		add_filter( 'woocommerce_before_order_object_save', array( $this, 'maybe_prevent_order_status_change' ) );
+		add_filter( 'woocommerce_order_status_completed', array( $this, 'maybe_prevent_order_status_change' ), 5 );
 		add_action( 'aco_scheduled_order_completion', array( $this, 'process_scheduled_order_completion' ) );
 
 		apply_filters( 'avarda_schedule_order_completion_status', $this->completed_status );
+		apply_filters( 'avarda_schedule_order_failed_status', $this->failed_status );
+		apply_filters( 'avarda_schedule_order_on_hold_status', $this->on_hold_status );
 	}
 
 	/**
 	 * Maybe prevent the order status change.
 	 *
-	 * @param \WC_Order $order The order object.
+	 * @param int $order_id The order id.
+	 *
+	 * @return void
 	 */
-	public function maybe_prevent_order_status_change( $order ) {
-		$changes = $order->get_changes();
+	public function maybe_prevent_order_status_change( $order_id ) {
+		// Get the WC_Order object from the order id.
+		$order = wc_get_order( $order_id );
 
-		// Only allow this for ACO orders, the changes includes the status and the new status is completed.
-		if ( 'aco' !== $order->get_payment_method() || ! isset( $changes['status'] ) || $this->completed_status !== $changes['status'] ) {
-			return $order;
+		// If we could not get the order, or its not a Avarda order, we don't need to do anything.
+		if ( ! $order || 'aco' !== $order->get_payment_method() ) {
+			return;
 		}
 
 		$result = $this->should_schedule_order_completion( $order );
 		if ( $result ) { // If the result true, we need to reschedule it.
 			$this->schedule_order_completion( $order );
-		}
 
-		return $order;
+			// Unhook the order completion action from Avarda so it does not run, and set it to on-hold.
+			remove_action( 'woocommerce_order_status_completed', array( ACO_WC()->order_management, 'activate_reservation' ) );
+			$order->update_status( $this->on_hold_status, __( 'The Avarda order could not be activated. It will be scheduled to try again later.', 'avarda-schedule-order-completion' ) );
+			$order->save();
+		}
 	}
 
 	/**
@@ -73,7 +95,21 @@ class Scheduler {
 
 			$result = $this->should_schedule_order_completion( $order, true );
 			if ( $result ) { // If the result true, we need to reschedule it.
+				$order->add_order_note( __( 'The Avarda order could not be activated after being scheduled. It will be scheduled to try again later.', 'avarda-schedule-order-completion' ) );
 				$to_reschedule[] = $order;
+				continue;
+			}
+
+			ACO_WC()->order_management->activate_reservation( $order_id ); // @phpstan-ignore-line
+
+			// If we did any of the actions for a failed capture call, then we need to reschedule the order.
+			if ( did_action( 'aco_om_failed' ) > 0 ) {
+				// Get the amount of times the order has been rescheduled.
+				$reschedule_count = intval( $order->get_meta( '_aco_reschedule_completion_count' ) ?: 0 ); // phpcs:ignore
+				$order->update_meta_data( '_aco_reschedule_completion_count', strval( $reschedule_count + 1 ) );
+				$order->add_order_note( __( 'The Avarda order could not be activated after being scheduled, and a activation request was made. It will be scheduled to try again later.', 'avarda-schedule-order-completion' ) );
+				$to_reschedule[] = $order;
+				$order->save();
 				continue;
 			}
 
@@ -154,7 +190,7 @@ class Scheduler {
 	 *
 	 * @return bool
 	 */
-	public function should_schedule_order_completion( $order, $update_count = true ) {
+	public function should_schedule_order_completion( &$order, $update_count = true ) {
 		// Get the purchase from Avarda.
 		$purchase_id      = $order->get_meta( '_wc_avarda_purchase_id' );
 		$reschedule_count = 0;
@@ -163,23 +199,25 @@ class Scheduler {
 		if ( ! empty( $purchase_id ) ) { // If we have a purchase id, we can try to get the payment.
 			$payment = ACO_WC()->api->request_get_payment( $purchase_id ); // @phpstan-ignore-line
 
-			if ( ! is_wp_error( $payment ) && $payment['processedBackEnd'] ) { // If we could get the payment, and it is processed, we can complete the order.
+			$is_processed_backend = apply_filters( 'aco_is_processed_backend', $payment['processedBackEnd'] ?? false, $payment, $order );
+
+			if ( ! is_wp_error( $payment ) && $is_processed_backend ) { // If we could get the payment, and it is processed, we can complete the order.
 				return apply_filters( 'aco_should_schedule_order_completion', false, $order, $payment );
 			}
 
 			// Get the amount of times the order has been rescheduled.
 			$reschedule_count = intval( $order->get_meta( '_aco_reschedule_completion_count' ) ?: 0 ); // phpcs:ignore
 
-			// If the order was rescheduled 5 times, we need to set the order to on-hold, and stop it from being rescheduled.
+			// If the order was rescheduled 5 times, we need to set the order to failed, and stop it from being rescheduled.
 			if ( $reschedule_count >= 5 ) {
-				$order->set_status( 'on-hold', __( 'The Avarda order could not be activated. The order has been rescheduled 5 times and will not be scheduled again.', 'avarda-schedule-order-completion' ) );
+				$order->set_status( $this->failed_status, __( 'The Avarda order could not be activated. The order has been rescheduled 5 times and will not be scheduled again.', 'avarda-schedule-order-completion' ) );
 				$order->save();
 
 				return apply_filters( 'aco_should_schedule_order_completion', false, $order, $payment );
 			}
 		}
 
-		$order->set_status( 'on-hold', __( 'The Avarda order could not be activated. It will be scheduled to try again later.', 'avarda-schedule-order-completion' ) );
+		$order->set_status( $this->on_hold_status, __( 'The Avarda order could not be activated. It will be scheduled to try again later.', 'avarda-schedule-order-completion' ) );
 		if ( $update_count ) { // If the count should be updated, we need to update the reschedule count. This only needs to be done if the trigger is not from the scheduled event.
 			$order->update_meta_data( '_aco_reschedule_completion_count', strval( $reschedule_count + 1 ) );
 		}

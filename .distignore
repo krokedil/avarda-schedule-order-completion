@@ -1,0 +1,10 @@
+.distignore
+.gitignore
+.git/
+.git/**/*
+.github/
+.github/**/*
+composer.json
+composer.lock
+phpcs.xml
+phpstan.neon

@@ -36,6 +36,7 @@ class Plugin {
 	 * @return void
 	 */
 	public function init() {
+		load_plugin_textdomain( 'avarda-schedule-order-completion', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
 		$this->load_dependencies();
 	}
 

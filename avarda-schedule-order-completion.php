@@ -3,7 +3,7 @@
  * Plugin Name:     Avarda Schedule Order Completion feature plugin.
  * Plugin URI:      http://krokedil.com/
  * Description:     Adds functionality to schedule order completion in cases where the order could not be completed in Avarda due to issues with the payment.
- * Version:         1.0.0
+ * Version:         1.2.0
  * Author:          Krokedil
  * Author URI:      http://krokedil.com/
  * Developer:       Krokedil
@@ -14,7 +14,7 @@
  * Requires Plugins: woocommerce, avarda-checkout-for-woocommerce
  *
  * WC requires at least: 5.6.0
- * WC tested up to: 9.3.3
+ * WC tested up to: 9.4.2
  *
  * Copyright:       © 2020-2024 Krokedil.
  * License:         GNU General Public License v3.0
@@ -27,7 +27,7 @@ use Krokedil\Avarda\ScheduleOrderCompletion\Plugin;
 
 defined( 'ABSPATH' ) || exit;
 
-const ACO_SOC_VERSION = '1.0.0';
+const ACO_SOC_VERSION = '1.2.0';
 define( 'ACO_SOC_MAIN_FILE', __FILE__ );
 define( 'ACO_SOC_PLUGIN_PATH', untrailingslashit( plugin_dir_path( __FILE__ ) ) );
 define( 'ACO_SOC_PLUGIN_URL', untrailingslashit( plugin_dir_url( __FILE__ ) ) );
