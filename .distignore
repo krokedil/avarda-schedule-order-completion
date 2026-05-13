@@ -1,5 +1,6 @@
 .distignore
 .gitignore
+.gitattributes
 .git/
 .git/**/*
 .github/
