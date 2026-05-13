@@ -30,7 +30,7 @@ jobs:
     - name: Install dependencies and build project
       run: |
         mkdir -p ~/.composer/cache
-        composer install --prefer-dist --no-progress
+        composer install --no-dev --prefer-dist --no-progress
 
     - name: Get branch name and commit hash
       id: vars
@@ -46,7 +46,7 @@ jobs:
       run: |
         sed -i "s/^ \* Version: \(.*\)/ \* Version: \1-dev.${BRANCH_NAME}.${COMMIT_HASH}/" ${{ env.PLUGIN_SLUG }}.php
         mkdir -p dev-zip-temp/${{ env.PLUGIN_SLUG }}
-        rsync -av --exclude-from='.kernlignore' --exclude='dev-zip-temp' . dev-zip-temp/${{ env.PLUGIN_SLUG }}
+        rsync -av --exclude-from='.distignore' --exclude='dev-zip-temp' . dev-zip-temp/${{ env.PLUGIN_SLUG }}
         cd dev-zip-temp
         zip -r ../${{ env.ZIP_FILE_NAME }} ${{ env.PLUGIN_SLUG }}
 
