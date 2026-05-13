@@ -40,9 +40,9 @@ class Scheduler {
 		add_filter( 'woocommerce_order_status_completed', array( $this, 'maybe_prevent_order_status_change' ), 5 );
 		add_action( 'aco_scheduled_order_completion', array( $this, 'process_scheduled_order_completion' ) );
 
-		apply_filters( 'avarda_schedule_order_completion_status', $this->completed_status );
-		apply_filters( 'avarda_schedule_order_failed_status', $this->failed_status );
-		apply_filters( 'avarda_schedule_order_on_hold_status', $this->on_hold_status );
+		$this->completed_status = apply_filters( 'avarda_schedule_order_completion_status', $this->completed_status );
+		$this->failed_status    = apply_filters( 'avarda_schedule_order_failed_status', $this->failed_status );
+		$this->on_hold_status   = apply_filters( 'avarda_schedule_order_on_hold_status', $this->on_hold_status );
 	}
 
 	/**
