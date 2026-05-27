@@ -100,10 +100,31 @@ class Scheduler {
 				continue;
 			}
 
-			ACO_WC()->order_management->activate_reservation( $order_id ); // @phpstan-ignore-line
+			try {
+				// If the order status we should set the order to is not the completed status, we need to trigger the order activation ourselves before we set the order status.
+				if ( 'completed' !== $this->completed_status ) {
+					ACO_WC()->order_management->activate_reservation( $order_id ); // @phpstan-ignore-line
 
-			// If we did any of the actions for a failed capture call, then we need to reschedule the order.
-			if ( did_action( 'aco_om_failed' ) > 0 ) {
+					// If we did any of the actions for a failed capture call, then we need to reschedule the order.
+					if ( did_action( 'aco_om_failed' ) > 0 ) {
+						throw new \Exception( 'The Avarda order could not be activated after being scheduled, and a activation request was made. It will be scheduled to try again later.' );
+					}
+
+					// If the request was successful, we can set the order to the completed status.
+					$order->update_status( $this->completed_status, __( 'Scheduled completion of the Avarda order.', 'avarda-schedule-order-completion' ) );
+					$order->save();
+				} else {
+					// If the completed status is the same as the status we want to set, we can just set the order to the completed status, and let the normal order completion process handle the activation.
+					$order->update_status( $this->completed_status, __( 'Scheduled completion of the Avarda order.', 'avarda-schedule-order-completion' ) );
+					$order->save();
+
+					// If we did any of the actions for a failed capture call, then we need to reschedule the order.
+					if ( did_action( 'aco_om_failed' ) > 0 ) {
+						throw new \Exception( 'The Avarda order could not be activated after being scheduled, and a activation request was made. It will be scheduled to try again later.' );
+					}
+				}
+
+			} catch( \Exception $e ) {
 				// Get the amount of times the order has been rescheduled.
 				$reschedule_count = intval( $order->get_meta( '_aco_reschedule_completion_count' ) ?: 0 ); // phpcs:ignore
 				$order->update_meta_data( '_aco_reschedule_completion_count', strval( $reschedule_count + 1 ) );
@@ -112,10 +133,6 @@ class Scheduler {
 				$order->save();
 				continue;
 			}
-
-			// If the purchase is processed, we can complete the order.
-			$order->update_status( $this->completed_status, __( 'Scheduled completion of the Avarda order.', 'avarda-schedule-order-completion' ) );
-			$order->save();
 		}
 
 		// If we have orders to reschedule, we need to schedule them again.
